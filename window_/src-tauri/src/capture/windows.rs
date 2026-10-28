@@ -53,7 +53,7 @@ impl WindowsCapture {
             .spawn(move || {
                 let outcome = unsafe { run_capture(pid, tx, stop_thread, &ready_tx) };
                 if let Err(e) = outcome {
-                    let _ = ready_tx.send(Err(format!("{e}")));
+                    let _ = ready_tx.send(Err(e.to_string()));
                 }
             })
             .map_err(|e| CaptureError::Platform(format!("spawn capture thread: {e}")))?;
@@ -126,7 +126,7 @@ unsafe fn run_capture(
     let _co_guard = CoUninitGuard;
 
     let wave = WAVEFORMATEX {
-        wFormatTag: WAVE_FORMAT_IEEE_FLOAT as u16,
+        wFormatTag: WAVE_FORMAT_IEEE_FLOAT,
         nChannels: 2,
         nSamplesPerSec: 48_000,
         wBitsPerSample: 32,

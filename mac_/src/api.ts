@@ -53,6 +53,8 @@ export const api = {
     invoke<void>("open_system_settings", { pane }),
 
   defaultRecordingsDir: () => invoke<string>("default_recordings_dir"),
+
+  openRecordingsDir: () => invoke<void>("open_recordings_dir"),
 };
 
 export function onAudioLevel(handler: (level: number) => void): Promise<UnlistenFn> {

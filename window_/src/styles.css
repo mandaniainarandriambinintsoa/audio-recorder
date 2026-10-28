@@ -239,6 +239,41 @@ body, html, #root {
   font-family: ui-monospace, "SF Mono", monospace;
 }
 
+.output-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.output-row .output-path {
+  flex: 1;
+  min-width: 0;
+}
+.open-folder-button {
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 7px;
+  background: white;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+}
+.recording-saved {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #e3f8e8;
+  color: #145c25;
+  font-size: 11px;
+}
+.recording-saved strong { font-size: 12px; }
+@media (prefers-color-scheme: dark) {
+  .open-folder-button { background: #2c2c2e; border-color: rgba(255,255,255,0.15); }
+  .recording-saved { background: #173d21; color: #c8f5d2; }
+}
+
 .record-button {
   padding: 14px;
   font-size: 16px;

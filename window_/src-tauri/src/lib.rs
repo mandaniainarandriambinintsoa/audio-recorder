@@ -40,6 +40,7 @@ pub fn run() {
             commands::check_permissions,
             commands::open_system_settings,
             commands::default_recordings_dir,
+            commands::open_recordings_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

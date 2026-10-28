@@ -330,6 +330,25 @@ pub fn default_recordings_dir() -> String {
     default_dir().to_string_lossy().to_string()
 }
 
+#[tauri::command]
+pub fn open_recordings_dir() -> std::result::Result<(), String> {
+    let directory = default_dir();
+    std::fs::create_dir_all(&directory).map_err(|e| format!("create recordings dir: {e}"))?;
+
+    #[cfg(target_os = "windows")]
+    let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("open");
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut command = std::process::Command::new("xdg-open");
+
+    command
+        .arg(&directory)
+        .spawn()
+        .map_err(|e| format!("open recordings dir: {e}"))?;
+    Ok(())
+}
+
 fn default_dir() -> PathBuf {
     dirs::document_dir()
         .unwrap_or_else(|| dirs_home().join("Documents"))

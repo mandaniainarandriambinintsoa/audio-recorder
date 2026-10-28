@@ -13,6 +13,10 @@ export default function RecordControls() {
     setError,
   } = useRecorder();
   const [elapsed, setElapsed] = useState(0);
+  const [lastRecording, setLastRecording] = useState<{
+    fileName: string;
+    durationSeconds: number;
+  } | null>(null);
 
   const isRecording = status.kind === "recording";
 
@@ -32,6 +36,10 @@ export default function RecordControls() {
     if (isRecording) {
       try {
         const meta = await api.stopRecording();
+        setLastRecording({
+          fileName: fileName(meta.output_path),
+          durationSeconds: meta.duration_seconds,
+        });
         // eslint-disable-next-line no-console
         console.info(`Saved ${meta.output_path} (${meta.duration_seconds.toFixed(1)}s)`);
       } catch (e) {
@@ -46,6 +54,7 @@ export default function RecordControls() {
       return;
     }
     try {
+      setLastRecording(null);
       const result = await api.startRecording({
         pid: selectedPid,
         mic_mix: micMix,
@@ -53,6 +62,14 @@ export default function RecordControls() {
       setStatus(result);
     } catch (e) {
       setError(`Démarrage impossible : ${e}`);
+    }
+  };
+
+  const openRecordingsDir = async () => {
+    try {
+      await api.openRecordingsDir();
+    } catch (e) {
+      setError(`Impossible d’ouvrir le dossier : ${e}`);
     }
   };
 
@@ -70,9 +87,22 @@ export default function RecordControls() {
         </label>
         <span className="size-hint">MP3 mono 64 kbit/s · ~29 Mo/heure</span>
       </div>
-      <p className="output-path">
-        {defaultDir ? `Dossier : ${truncate(defaultDir)}` : "Préparation du dossier local…"}
-      </p>
+      <div className="output-row">
+        <p className="output-path" title={defaultDir}>
+          {defaultDir ? `Dossier : ${truncate(defaultDir)}` : "Préparation du dossier local…"}
+        </p>
+        <button className="open-folder-button" onClick={openRecordingsDir} type="button">
+          Ouvrir le dossier
+        </button>
+      </div>
+      {lastRecording && (
+        <div className="recording-saved" role="status">
+          <strong>Enregistrement sauvegardé</strong>
+          <span title={lastRecording.fileName}>
+            {truncate(lastRecording.fileName, 48)} · {formatTime(lastRecording.durationSeconds)}
+          </span>
+        </div>
+      )}
       <button
         className={`record-button ${isRecording ? "stop" : "start"}`}
         onClick={startStop}
@@ -82,6 +112,10 @@ export default function RecordControls() {
       </button>
     </section>
   );
+}
+
+function fileName(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
 }
 
 function truncate(p: string, max = 56): string {

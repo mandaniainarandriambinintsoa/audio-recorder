@@ -152,7 +152,11 @@ mod macos {
         out.sort_by(|a, b| {
             category_order(a.category)
                 .cmp(&category_order(b.category))
-                .then_with(|| a.display_name.to_lowercase().cmp(&b.display_name.to_lowercase()))
+                .then_with(|| {
+                    a.display_name
+                        .to_lowercase()
+                        .cmp(&b.display_name.to_lowercase())
+                })
         });
         out
     }
@@ -220,10 +224,7 @@ mod windows {
                 continue;
             }
 
-            let title = titles
-                .get(&top_pid)
-                .cloned()
-                .unwrap_or_else(|| exe.clone());
+            let title = titles.get(&top_pid).cloned().unwrap_or_else(|| exe.clone());
 
             out.push(ProcessInfo {
                 pid: top_pid,
@@ -239,7 +240,11 @@ mod windows {
         out.sort_by(|a, b| {
             category_order(a.category)
                 .cmp(&category_order(b.category))
-                .then_with(|| a.display_name.to_lowercase().cmp(&b.display_name.to_lowercase()))
+                .then_with(|| {
+                    a.display_name
+                        .to_lowercase()
+                        .cmp(&b.display_name.to_lowercase())
+                })
         });
         out
     }

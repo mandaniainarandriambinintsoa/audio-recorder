@@ -42,6 +42,15 @@ body, html, #root {
   font-size: 13px;
 }
 
+.consent-note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff5d6;
+  color: #6a4400;
+  font-size: 12px;
+}
+
 .banner {
   padding: 8px 12px;
   border-radius: 8px;
@@ -217,17 +226,10 @@ body, html, #root {
   gap: 6px;
   font-size: 13px;
 }
-.save-as {
+.size-hint {
   font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(0,0,0,0.15);
-  background: white;
-  color: inherit;
-  cursor: pointer;
-}
-@media (prefers-color-scheme: dark) {
-  .save-as { background: #2c2c2e; border-color: rgba(255,255,255,0.15); }
+  opacity: 0.65;
+  text-align: right;
 }
 
 .output-path {
@@ -274,5 +276,6 @@ body, html, #root {
   font-size: 13px;
 }
 @media (prefers-color-scheme: dark) {
+  .consent-note { background: #4a3a14; color: #ffe5a4; }
   .permission-buttons button { background: #2c2c2e; border-color: rgba(255,255,255,0.15); }
 }

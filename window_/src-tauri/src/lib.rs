@@ -19,10 +19,13 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_process::init())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                if let Some(state) = window.try_state::<RecorderState>() {
+                    let _ = commands::stop_recording(state);
+                }
+            }
+        })
         .setup(|app| {
             let state = RecorderState::new(app.handle().clone());
             app.manage(state);

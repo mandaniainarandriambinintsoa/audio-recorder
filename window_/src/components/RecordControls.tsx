@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import { useRecorder } from "../store";
 
@@ -9,12 +8,9 @@ export default function RecordControls() {
     micMix,
     status,
     defaultDir,
-    outputOverride,
     setMicMix,
     setStatus,
-    setOutputOverride,
     setError,
-    processes,
   } = useRecorder();
   const [elapsed, setElapsed] = useState(0);
 
@@ -36,40 +32,28 @@ export default function RecordControls() {
     if (isRecording) {
       try {
         const meta = await api.stopRecording();
-        setStatus({ kind: "idle" });
-        setOutputOverride(null);
         // eslint-disable-next-line no-console
         console.info(`Saved ${meta.output_path} (${meta.duration_seconds.toFixed(1)}s)`);
       } catch (e) {
-        setError(`Stop failed: ${e}`);
+        setError(`Arrêt impossible : ${e}`);
+      } finally {
+        setStatus({ kind: "idle" });
       }
       return;
     }
     if (selectedPid == null) {
-      setError("Pick an app to record first.");
+      setError("Sélectionne d’abord l’application de l’appel.");
       return;
     }
-    const proc = processes.find((p) => p.pid === selectedPid);
     try {
       const result = await api.startRecording({
         pid: selectedPid,
         mic_mix: micMix,
-        output_path: outputOverride ?? undefined,
-        source_app: proc?.display_name ?? proc?.exe_basename,
       });
       setStatus(result);
     } catch (e) {
-      setError(`Start failed: ${e}`);
+      setError(`Démarrage impossible : ${e}`);
     }
-  };
-
-  const chooseSavePath = async () => {
-    const chosen = await save({
-      title: "Save recording as",
-      defaultPath: defaultDir || undefined,
-      filters: [{ name: "MP3 audio", extensions: ["mp3"] }],
-    });
-    if (chosen) setOutputOverride(chosen);
   };
 
   return (
@@ -82,21 +66,19 @@ export default function RecordControls() {
             onChange={(e) => setMicMix(e.target.checked)}
             disabled={isRecording}
           />
-          Mix microphone
+          Inclure mon microphone
         </label>
-        <button className="save-as" onClick={chooseSavePath} disabled={isRecording}>
-          Save to…
-        </button>
+        <span className="size-hint">MP3 mono 64 kbit/s · ~29 Mo/heure</span>
       </div>
       <p className="output-path">
-        {outputOverride
-          ? truncate(outputOverride)
-          : defaultDir
-            ? `Default: ${truncate(defaultDir)}/`
-            : "Default folder…"}
+        {defaultDir ? `Dossier : ${truncate(defaultDir)}` : "Préparation du dossier local…"}
       </p>
-      <button className={`record-button ${isRecording ? "stop" : "start"}`} onClick={startStop}>
-        {isRecording ? `Stop (${formatTime(elapsed)})` : "Record"}
+      <button
+        className={`record-button ${isRecording ? "stop" : "start"}`}
+        onClick={startStop}
+        aria-live="polite"
+      >
+        {isRecording ? `Arrêter (${formatTime(elapsed)})` : "Enregistrer l’appel"}
       </button>
     </section>
   );

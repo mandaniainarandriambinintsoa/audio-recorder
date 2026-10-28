@@ -52,6 +52,7 @@ pub struct RunningRecording {
     pub pid: u32,
     pub source_app: String,
     pub output_path: PathBuf,
+    pub working_output_path: PathBuf,
     pub started_at: Instant,
     pub started_at_iso: String,
     pub mic_mix: bool,
@@ -90,8 +91,6 @@ pub fn list_recordable_processes() -> Vec<ProcessInfo> {
 pub struct StartArgs {
     pub pid: u32,
     pub mic_mix: bool,
-    pub output_path: Option<String>,
-    pub source_app: Option<String>,
 }
 
 #[tauri::command]
@@ -104,12 +103,14 @@ pub fn start_recording(
         return Err("a recording is already in progress".into());
     }
 
-    let resolved_pid = process_list::resolve_top_level_pid(args.pid);
-    let source_app = args.source_app.unwrap_or_else(|| format!("pid-{resolved_pid}"));
-    let output_path = match args.output_path {
-        Some(p) => PathBuf::from(p),
-        None => default_output_path(&source_app),
-    };
+    let selected_process = process_list::list_processes()
+        .into_iter()
+        .find(|process| process.pid == args.pid)
+        .ok_or_else(|| "the selected application is no longer available".to_string())?;
+    let resolved_pid = process_list::resolve_top_level_pid(selected_process.pid);
+    let source_app = selected_process.display_name;
+    let output_path = default_output_path(&source_app);
+    let working_output_path = partial_output_path(&output_path);
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("create output dir: {e}"))?;
     }
@@ -117,8 +118,8 @@ pub fn start_recording(
     let stop_flag = Arc::new(AtomicBool::new(false));
 
     let (cap_tx, cap_rx): (Sender<AudioChunk>, Receiver<AudioChunk>) = bounded(64);
-    let capture = capture::start_capture(resolved_pid, cap_tx)
-        .map_err(|e| format!("capture start: {e}"))?;
+    let capture =
+        capture::start_capture(resolved_pid, cap_tx).map_err(|e| format!("capture start: {e}"))?;
 
     let (mic_capture, mic_rx) = if args.mic_mix {
         let (mic_tx, mic_rx) = bounded::<AudioChunk>(64);
@@ -154,7 +155,7 @@ pub fn start_recording(
         started_at_iso: started_at_iso.clone(),
     };
     let enc_stop = stop_flag.clone();
-    let enc_path = output_path.clone();
+    let enc_path = working_output_path.clone();
     let encoder_join = thread::Builder::new()
         .name("audio-encoder".into())
         .spawn(move || encoder::run(mix_rx, enc_path, enc_meta, enc_stop))
@@ -181,6 +182,7 @@ pub fn start_recording(
         pid: resolved_pid,
         source_app: source_app.clone(),
         output_path: output_path.clone(),
+        working_output_path,
         started_at,
         started_at_iso: started_at_iso.clone(),
         mic_mix: mic_capture.is_some(),
@@ -204,13 +206,14 @@ pub fn start_recording(
 }
 
 #[tauri::command]
-pub fn stop_recording(state: State<'_, RecorderState>) -> std::result::Result<RecordingMeta, String> {
+pub fn stop_recording(
+    state: State<'_, RecorderState>,
+) -> std::result::Result<RecordingMeta, String> {
     let mut guard = state.lock();
     if !matches!(*guard, RecorderInner::Recording(_)) {
         return Err("not currently recording".into());
     }
-    let RecorderInner::Recording(mut rec) =
-        std::mem::replace(&mut *guard, RecorderInner::Idle)
+    let RecorderInner::Recording(mut rec) = std::mem::replace(&mut *guard, RecorderInner::Idle)
     else {
         unreachable!()
     };
@@ -221,20 +224,33 @@ pub fn stop_recording(state: State<'_, RecorderState>) -> std::result::Result<Re
     if let Some(j) = rec.mixer_join.take() {
         let _ = j.join();
     }
+    let mut encoder_error = None;
     if let Some(j) = rec.encoder_join.take() {
         match j.join() {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
-                let _ = state.app_handle.emit("recording-error", format!("{e}"));
+                encoder_error = Some(format!("{e}"));
             }
             Err(_) => {
-                let _ = state.app_handle.emit("recording-error", "encoder thread panicked".to_string());
+                encoder_error = Some("encoder thread panicked".to_string());
             }
         }
     }
     if let Some(j) = rec.level_drain_join.take() {
         let _ = j.join();
     }
+
+    if let Some(error) = encoder_error {
+        let message = format!(
+            "encoding failed: {error}; partial file kept at {}",
+            rec.working_output_path.display()
+        );
+        let _ = state.app_handle.emit("recording-error", message.clone());
+        return Err(message);
+    }
+
+    std::fs::rename(&rec.working_output_path, &rec.output_path)
+        .map_err(|e| format!("finalize recording: {e}"))?;
 
     let duration = rec.started_at.elapsed().as_secs_f64();
     Ok(RecordingMeta {
@@ -315,8 +331,9 @@ pub fn default_recordings_dir() -> String {
 }
 
 fn default_dir() -> PathBuf {
-    let home = dirs_home();
-    home.join("Documents").join("AudioRecorder")
+    dirs::document_dir()
+        .unwrap_or_else(|| dirs_home().join("Documents"))
+        .join("AudioRecorder")
 }
 
 fn dirs_home() -> PathBuf {
@@ -330,10 +347,42 @@ fn dirs_home() -> PathBuf {
 }
 
 fn default_output_path(source_app: &str) -> PathBuf {
-    let safe: String = source_app
+    let mut safe: String = source_app
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .take(80)
         .collect();
-    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
-    default_dir().join(format!("{safe}-{stamp}.mp3"))
+    if safe.trim_matches('_').is_empty() {
+        safe = "appel".to_string();
+    }
+
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S-%3f").to_string();
+    let directory = default_dir();
+    for suffix in 0..1_000 {
+        let suffix = if suffix == 0 {
+            String::new()
+        } else {
+            format!("-{suffix}")
+        };
+        let candidate = directory.join(format!("{safe}-{stamp}{suffix}.mp3"));
+        if !candidate.exists() && !partial_output_path(&candidate).exists() {
+            return candidate;
+        }
+    }
+
+    directory.join(format!("appel-{stamp}-{}.mp3", std::process::id()))
+}
+
+fn partial_output_path(final_path: &std::path::Path) -> PathBuf {
+    let file_name = final_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("appel.mp3");
+    final_path.with_file_name(format!("{file_name}.part"))
 }

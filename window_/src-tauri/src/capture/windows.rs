@@ -13,21 +13,18 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::Sender;
-use windows::core::{implement, ComInterface, Interface, GUID, HRESULT, PCWSTR};
-use windows::Win32::Foundation::{E_FAIL, S_OK, WAIT_OBJECT_0};
+use windows::core::{implement, ComInterface, HRESULT, PCWSTR};
+use windows::Win32::Foundation::{S_OK, WAIT_OBJECT_0};
 use windows::Win32::Media::Audio::{
-    eRender, ActivateAudioInterfaceAsync, AudioCategory_Communications, IActivateAudioInterfaceAsyncOperation,
+    ActivateAudioInterfaceAsync, IActivateAudioInterfaceAsyncOperation,
     IActivateAudioInterfaceCompletionHandler, IActivateAudioInterfaceCompletionHandler_Impl,
     IAudioCaptureClient, IAudioClient, AUDCLNT_E_DEVICE_IN_USE, AUDCLNT_SHAREMODE_SHARED,
     AUDCLNT_STREAMFLAGS_LOOPBACK, AUDIOCLIENT_ACTIVATION_PARAMS, AUDIOCLIENT_ACTIVATION_PARAMS_0,
     AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK, AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS,
-    PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE, VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
-    WAVEFORMATEX,
+    PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE, WAVEFORMATEX,
 };
-use windows::Win32::System::Com::{
-    CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED, STGM_READ,
-};
-use windows::Win32::System::Threading::{CreateEventW, SetEvent, WaitForSingleObject, INFINITE};
+use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+use windows::Win32::System::Threading::{CreateEventW, SetEvent, WaitForSingleObject};
 
 use crate::capture::{AudioCapture, AudioChunk, AudioFormat, CaptureError, Result};
 
@@ -128,7 +125,7 @@ unsafe fn run_capture(
     CoInitializeEx(None, COINIT_MULTITHREADED).map_err(|e| e.to_string())?;
     let _co_guard = CoUninitGuard;
 
-    let mut wave = WAVEFORMATEX {
+    let wave = WAVEFORMATEX {
         wFormatTag: WAVE_FORMAT_IEEE_FLOAT as u16,
         nChannels: 2,
         nSamplesPerSec: 48_000,
@@ -148,8 +145,6 @@ unsafe fn run_capture(
         },
     };
 
-    let prop = windows::Win32::System::Com::StructuredStorage::PROPVARIANT::default();
-    let mut prop_with_blob = prop;
     let blob_ptr = &mut params as *mut _ as *mut c_void;
     let blob_size = std::mem::size_of::<AUDIOCLIENT_ACTIVATION_PARAMS>() as u32;
 
@@ -247,7 +242,6 @@ unsafe fn run_capture(
 
     let _ = audio_client.Stop();
 
-    let _ = (prop_with_blob, blob_size, INFINITE, _co_guard);
     Ok(())
 }
 

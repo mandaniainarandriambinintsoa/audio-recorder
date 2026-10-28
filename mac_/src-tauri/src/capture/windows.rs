@@ -16,10 +16,11 @@ use crossbeam_channel::Sender;
 use windows::core::{implement, Interface, GUID, HRESULT, PCWSTR};
 use windows::Win32::Foundation::{E_FAIL, S_OK, WAIT_OBJECT_0};
 use windows::Win32::Media::Audio::{
-    eRender, ActivateAudioInterfaceAsync, AudioCategory_Communications, IActivateAudioInterfaceAsyncOperation,
-    IActivateAudioInterfaceCompletionHandler, IActivateAudioInterfaceCompletionHandler_Impl,
-    IAudioCaptureClient, IAudioClient, AUDCLNT_E_DEVICE_IN_USE, AUDCLNT_SHAREMODE_SHARED,
-    AUDCLNT_STREAMFLAGS_LOOPBACK, AUDIOCLIENT_ACTIVATION_PARAMS, AUDIOCLIENT_ACTIVATION_PARAMS_0,
+    eRender, ActivateAudioInterfaceAsync, AudioCategory_Communications,
+    IActivateAudioInterfaceAsyncOperation, IActivateAudioInterfaceCompletionHandler,
+    IActivateAudioInterfaceCompletionHandler_Impl, IAudioCaptureClient, IAudioClient,
+    AUDCLNT_E_DEVICE_IN_USE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+    AUDIOCLIENT_ACTIVATION_PARAMS, AUDIOCLIENT_ACTIVATION_PARAMS_0,
     AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK, AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS,
     PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE, VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
     WAVEFORMATEX, WAVE_FORMAT_IEEE_FLOAT,
@@ -123,7 +124,9 @@ unsafe fn run_capture(
     stop: Arc<AtomicBool>,
     ready_tx: &std_mpsc::Sender<std::result::Result<(), String>>,
 ) -> std::result::Result<(), String> {
-    CoInitializeEx(None, COINIT_MULTITHREADED).ok().map_err(|e| e.to_string())?;
+    CoInitializeEx(None, COINIT_MULTITHREADED)
+        .ok()
+        .map_err(|e| e.to_string())?;
     let _co_guard = CoUninitGuard;
 
     let mut wave = WAVEFORMATEX {

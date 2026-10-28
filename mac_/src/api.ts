@@ -41,8 +41,6 @@ export const api = {
   startRecording: (args: {
     pid: number;
     mic_mix: boolean;
-    output_path?: string;
-    source_app?: string;
   }) => invoke<RecordingStatus>("start_recording", { args }),
 
   stopRecording: () => invoke<RecordingMeta>("stop_recording"),

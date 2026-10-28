@@ -28,6 +28,9 @@ pub fn setup(app: &mut App) -> tauri::Result<()> {
                 }
             }
             "quit" => {
+                if let Some(state) = app.try_state::<crate::commands::RecorderState>() {
+                    let _ = crate::commands::stop_recording(state);
+                }
                 app.exit(0);
             }
             _ => {}

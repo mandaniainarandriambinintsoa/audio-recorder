@@ -3,9 +3,9 @@ import { api, type Category, type ProcessInfo } from "../api";
 import { useRecorder } from "../store";
 
 const badgeFor: Record<Category, string> = {
-  browser: "Browser",
-  meetingapp: "Meeting",
-  other: "App",
+  browser: "Navigateur",
+  meetingapp: "Appel",
+  other: "Application",
 };
 
 export default function ProcessList() {
@@ -26,7 +26,7 @@ export default function ProcessList() {
     try {
       setProcesses(await api.listProcesses());
     } catch (e) {
-      setError(`Refresh failed: ${e}`);
+      setError(`Actualisation impossible : ${e}`);
     }
   };
 
@@ -35,12 +35,12 @@ export default function ProcessList() {
       <div className="process-list-header">
         <input
           className="search"
-          placeholder="Search apps…"
+          placeholder="Rechercher une application…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <button className="refresh" onClick={refresh}>
-          Refresh
+          Actualiser
         </button>
       </div>
       <ul>
@@ -67,7 +67,7 @@ export default function ProcessList() {
           </li>
         ))}
         {filtered.length === 0 && (
-          <li className="empty">No processes match.</li>
+          <li className="empty">Aucune application correspondante.</li>
         )}
       </ul>
     </section>

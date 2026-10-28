@@ -19,10 +19,13 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_process::init())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                if let Some(state) = window.try_state::<RecorderState>() {
+                    let _ = commands::stop_recording(state);
+                }
+            }
+        })
         .setup(|app| {
             let state = RecorderState::new(app.handle().clone());
             app.manage(state);
@@ -37,6 +40,7 @@ pub fn run() {
             commands::check_permissions,
             commands::open_system_settings,
             commands::default_recordings_dir,
+            commands::open_recordings_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

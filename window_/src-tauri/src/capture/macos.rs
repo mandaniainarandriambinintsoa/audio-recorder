@@ -97,12 +97,11 @@ impl MacCapture {
             .find(|a| a.process_id() as u32 == pid)
             .ok_or(CaptureError::ProcessNotFound(pid))?;
 
-        let filter = SCContentFilter::new()
-            .with_display_including_application_excepting_windows(
-                display,
-                &[target_app],
-                &[],
-            );
+        let filter = SCContentFilter::new().with_display_including_application_excepting_windows(
+            display,
+            &[target_app],
+            &[],
+        );
 
         let config = SCStreamConfiguration::new()
             .set_captures_audio(true)
@@ -152,7 +151,10 @@ impl Drop for MacCapture {
 
 fn permission_or_platform(msg: String) -> CaptureError {
     let lower = msg.to_lowercase();
-    if lower.contains("permission") || lower.contains("declined") || lower.contains("not authorized") {
+    if lower.contains("permission")
+        || lower.contains("declined")
+        || lower.contains("not authorized")
+    {
         CaptureError::PermissionDenied(msg)
     } else {
         CaptureError::Platform(msg)

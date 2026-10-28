@@ -1,4 +1,3 @@
-import { relaunch } from "@tauri-apps/plugin-process";
 import { api } from "../api";
 
 interface Props {
@@ -17,13 +16,12 @@ export default function PermissionGate({ onRetry }: Props) {
       <ol>
         <li>Click <strong>Open Privacy Settings</strong> below.</li>
         <li>Enable <em>Audio Recorder</em> under Screen Recording.</li>
-        <li>Relaunch the app to apply the permission.</li>
+        <li>Quitte puis rouvre l’application pour appliquer l’autorisation.</li>
       </ol>
       <div className="permission-buttons">
         <button onClick={() => api.openSystemSettings("screenrecording")}>
           Open Privacy Settings
         </button>
-        <button onClick={() => relaunch()}>Relaunch app</button>
         <button onClick={onRetry}>I’ve granted it</button>
       </div>
     </div>

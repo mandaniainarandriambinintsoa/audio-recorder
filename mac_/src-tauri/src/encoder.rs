@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -7,9 +7,11 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use crossbeam_channel::{Receiver, RecvTimeoutError};
-use mp3lame_encoder::{Builder, FlushNoGap, InterleavedPcm};
+use mp3lame_encoder::{Builder, FlushNoGap, Mode, MonoPcm};
 
 use crate::capture::AudioChunk;
+
+const OUTPUT_BITRATE_KBPS: u16 = 64;
 
 #[derive(Debug, Clone)]
 pub struct EncoderMetadata {
@@ -25,14 +27,17 @@ pub fn run(
 ) -> Result<()> {
     let mut builder = Builder::new().context("init lame builder")?;
     builder
-        .set_num_channels(2)
+        .set_num_channels(1)
         .map_err(|e| anyhow::anyhow!("lame channels: {e:?}"))?;
     builder
         .set_sample_rate(48_000)
         .map_err(|e| anyhow::anyhow!("lame sample rate: {e:?}"))?;
     builder
-        .set_brate(mp3lame_encoder::Bitrate::Kbps192)
+        .set_brate(mp3lame_encoder::Bitrate::Kbps64)
         .map_err(|e| anyhow::anyhow!("lame bitrate: {e:?}"))?;
+    builder
+        .set_mode(Mode::Mono)
+        .map_err(|e| anyhow::anyhow!("lame mode: {e:?}"))?;
     builder
         .set_quality(mp3lame_encoder::Quality::Good)
         .map_err(|e| anyhow::anyhow!("lame quality: {e:?}"))?;
@@ -40,7 +45,10 @@ pub fn run(
         .build()
         .map_err(|e| anyhow::anyhow!("lame build: {e:?}"))?;
 
-    let file = File::create(&output_path)
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&output_path)
         .with_context(|| format!("create {}", output_path.display()))?;
     let mut writer = BufWriter::new(file);
 
@@ -83,19 +91,18 @@ fn encode_chunk(
     mp3_out: &mut Vec<u8>,
     writer: &mut BufWriter<File>,
 ) -> Result<()> {
-    let interleaved_i16: Vec<i16> = chunk
-        .samples
-        .iter()
+    let mono_i16: Vec<i16> = downmix_stereo_to_mono(&chunk.samples)
+        .into_iter()
         .map(|s| (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
         .collect();
 
-    let frame_count = interleaved_i16.len() / 2;
+    let frame_count = mono_i16.len();
     let needed = mp3lame_encoder::max_required_buffer_size(frame_count);
     mp3_out.clear();
     mp3_out.reserve(needed);
 
     let written = encoder
-        .encode(InterleavedPcm(&interleaved_i16), mp3_out.spare_capacity_mut())
+        .encode(MonoPcm(&mono_i16), mp3_out.spare_capacity_mut())
         .map_err(|e| anyhow::anyhow!("lame encode: {e:?}"))?;
     unsafe { mp3_out.set_len(written) };
 
@@ -105,9 +112,19 @@ fn encode_chunk(
     Ok(())
 }
 
+fn downmix_stereo_to_mono(stereo: &[f32]) -> Vec<f32> {
+    stereo
+        .chunks_exact(2)
+        .map(|channels| (channels[0] + channels[1]) * 0.5)
+        .collect()
+}
+
 fn write_id3v2(writer: &mut BufWriter<File>, meta: &EncoderMetadata) -> std::io::Result<()> {
     let title = format!("Audio Recorder — {}", meta.source_app);
-    let comment = format!("Recorded {}", meta.started_at_iso);
+    let comment = format!(
+        "Recorded {}; mono {} kbit/s",
+        meta.started_at_iso, OUTPUT_BITRATE_KBPS
+    );
     let artist = "Audio Recorder";
 
     let mut frames = Vec::new();
@@ -142,4 +159,21 @@ fn synchsafe(n: u32) -> [u8; 4] {
         ((n >> 7) & 0x7F) as u8,
         (n & 0x7F) as u8,
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn downmixes_each_stereo_frame_without_clipping() {
+        let mono = downmix_stereo_to_mono(&[1.0, 1.0, 1.0, -1.0, -0.5, 0.5]);
+        assert_eq!(mono, vec![1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn output_bitrate_matches_the_size_shown_in_the_ui() {
+        let bytes_per_hour = u64::from(OUTPUT_BITRATE_KBPS) * 1_000 * 3_600 / 8;
+        assert_eq!(bytes_per_hour, 28_800_000);
+    }
 }

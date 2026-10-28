@@ -11,7 +11,6 @@ interface RecorderStore {
   errorBanner: string | null;
   warningBanner: string | null;
   defaultDir: string;
-  outputOverride: string | null;
 
   setProcesses: (p: ProcessInfo[]) => void;
   setSelectedPid: (pid: number | null) => void;
@@ -22,20 +21,18 @@ interface RecorderStore {
   setError: (e: string | null) => void;
   setWarning: (w: string | null) => void;
   setDefaultDir: (d: string) => void;
-  setOutputOverride: (p: string | null) => void;
 }
 
 export const useRecorder = create<RecorderStore>((set) => ({
   processes: [],
   selectedPid: null,
   search: "",
-  micMix: false,
+  micMix: true,
   status: { kind: "idle" },
   level: 0,
   errorBanner: null,
   warningBanner: null,
   defaultDir: "",
-  outputOverride: null,
 
   setProcesses: (p) => set({ processes: p }),
   setSelectedPid: (pid) => set({ selectedPid: pid }),
@@ -46,5 +43,4 @@ export const useRecorder = create<RecorderStore>((set) => ({
   setError: (e) => set({ errorBanner: e }),
   setWarning: (w) => set({ warningBanner: w }),
   setDefaultDir: (d) => set({ defaultDir: d }),
-  setOutputOverride: (p) => set({ outputOverride: p }),
 }));

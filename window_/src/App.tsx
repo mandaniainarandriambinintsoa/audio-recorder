@@ -40,7 +40,7 @@ export default function App() {
       try {
         setProcesses(await api.listProcesses());
       } catch (e) {
-        setError(`Failed to list processes: ${e}`);
+        setError(`Impossible de lister les applications : ${e}`);
       }
     };
     void init();
@@ -70,9 +70,15 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Audio Recorder</h1>
-        <p className="subtitle">Record audio from one app at a time. Saved as MP3.</p>
+        <h1>Enregistreur d’appel</h1>
+        <p className="subtitle">
+          Audio uniquement · stockage local · aucun envoi réseau
+        </p>
       </header>
+
+      <p className="consent-note">
+        Préviens ton interlocuteur et obtiens son accord avant d’enregistrer.
+      </p>
 
       {errorBanner && (
         <div className="banner banner-error">

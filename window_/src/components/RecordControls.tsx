@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import { useRecorder } from "../store";
 
@@ -9,14 +8,15 @@ export default function RecordControls() {
     micMix,
     status,
     defaultDir,
-    outputOverride,
     setMicMix,
     setStatus,
-    setOutputOverride,
     setError,
-    processes,
   } = useRecorder();
   const [elapsed, setElapsed] = useState(0);
+  const [lastRecording, setLastRecording] = useState<{
+    fileName: string;
+    durationSeconds: number;
+  } | null>(null);
 
   const isRecording = status.kind === "recording";
 
@@ -36,40 +36,41 @@ export default function RecordControls() {
     if (isRecording) {
       try {
         const meta = await api.stopRecording();
-        setStatus({ kind: "idle" });
-        setOutputOverride(null);
+        setLastRecording({
+          fileName: fileName(meta.output_path),
+          durationSeconds: meta.duration_seconds,
+        });
         // eslint-disable-next-line no-console
         console.info(`Saved ${meta.output_path} (${meta.duration_seconds.toFixed(1)}s)`);
       } catch (e) {
-        setError(`Stop failed: ${e}`);
+        setError(`Arrêt impossible : ${e}`);
+      } finally {
+        setStatus({ kind: "idle" });
       }
       return;
     }
     if (selectedPid == null) {
-      setError("Pick an app to record first.");
+      setError("Sélectionne d’abord l’application de l’appel.");
       return;
     }
-    const proc = processes.find((p) => p.pid === selectedPid);
     try {
+      setLastRecording(null);
       const result = await api.startRecording({
         pid: selectedPid,
         mic_mix: micMix,
-        output_path: outputOverride ?? undefined,
-        source_app: proc?.display_name ?? proc?.exe_basename,
       });
       setStatus(result);
     } catch (e) {
-      setError(`Start failed: ${e}`);
+      setError(`Démarrage impossible : ${e}`);
     }
   };
 
-  const chooseSavePath = async () => {
-    const chosen = await save({
-      title: "Save recording as",
-      defaultPath: defaultDir || undefined,
-      filters: [{ name: "MP3 audio", extensions: ["mp3"] }],
-    });
-    if (chosen) setOutputOverride(chosen);
+  const openRecordingsDir = async () => {
+    try {
+      await api.openRecordingsDir();
+    } catch (e) {
+      setError(`Impossible d’ouvrir le dossier : ${e}`);
+    }
   };
 
   return (
@@ -82,24 +83,39 @@ export default function RecordControls() {
             onChange={(e) => setMicMix(e.target.checked)}
             disabled={isRecording}
           />
-          Mix microphone
+          Inclure mon microphone
         </label>
-        <button className="save-as" onClick={chooseSavePath} disabled={isRecording}>
-          Save to…
+        <span className="size-hint">MP3 mono 64 kbit/s · ~29 Mo/heure</span>
+      </div>
+      <div className="output-row">
+        <p className="output-path" title={defaultDir}>
+          {defaultDir ? `Dossier : ${truncate(defaultDir)}` : "Préparation du dossier local…"}
+        </p>
+        <button className="open-folder-button" onClick={openRecordingsDir} type="button">
+          Ouvrir le dossier
         </button>
       </div>
-      <p className="output-path">
-        {outputOverride
-          ? truncate(outputOverride)
-          : defaultDir
-            ? `Default: ${truncate(defaultDir)}/`
-            : "Default folder…"}
-      </p>
-      <button className={`record-button ${isRecording ? "stop" : "start"}`} onClick={startStop}>
-        {isRecording ? `Stop (${formatTime(elapsed)})` : "Record"}
+      {lastRecording && (
+        <div className="recording-saved" role="status">
+          <strong>Enregistrement sauvegardé</strong>
+          <span title={lastRecording.fileName}>
+            {truncate(lastRecording.fileName, 48)} · {formatTime(lastRecording.durationSeconds)}
+          </span>
+        </div>
+      )}
+      <button
+        className={`record-button ${isRecording ? "stop" : "start"}`}
+        onClick={startStop}
+        aria-live="polite"
+      >
+        {isRecording ? `Arrêter (${formatTime(elapsed)})` : "Enregistrer l’appel"}
       </button>
     </section>
   );
+}
+
+function fileName(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
 }
 
 function truncate(p: string, max = 56): string {

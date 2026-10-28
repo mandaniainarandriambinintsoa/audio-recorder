@@ -4,7 +4,7 @@
 
 A cross-platform desktop app for recording audio from your **microphone** and/or a **specific running application**, saved as MP3. Built with [Tauri 2](https://tauri.app/) (Rust) and a [React](https://react.dev/) + TypeScript frontend.
 
-Pick an app from the list (browser tab, meeting app, music player, etc.), optionally mix in your mic, hit record, and get an MP3 on disk.
+Pick the calling app, keep the microphone enabled, hit record, and get a compact MP3 on disk. The hardened fork is designed for local call notes: it does not capture video and contains no upload, account, analytics, or updater integration.
 
 ![Audio Recorder UI](ui.png)
 
@@ -15,12 +15,13 @@ Pick an app from the list (browser tab, meeting app, music player, etc.), option
 - **Per-application audio capture** — record only the audio coming from a chosen running process, not the whole system.
 - **Microphone capture** — record from the default input device.
 - **Mic + app mixing** — capture both sources into a single mixed MP3 (e.g. for meeting + commentary recordings).
-- **MP3 output** — encoded on the fly via `mp3lame-encoder`.
+- **Compact voice MP3** — mono, 64 kbit/s (about 29 MB per hour), encoded on the fly via `mp3lame-encoder`.
 - **Live VU meter** — real-time audio level feedback while recording.
 - **Process picker** — lists recordable processes with icons, grouped into browser / meeting app / other.
 - **Permission gating** — detects and guides the user through Screen Recording / Microphone permissions (macOS).
 - **System tray** — quick access without keeping a window open.
-- **Configurable output location** — defaults to a per-user recordings folder, can be overridden per session.
+- **Restricted local output** — files are written only to `Documents/AudioRecorder`; the WebView cannot choose arbitrary write locations.
+- **Crash-safe finalization** — recordings use a `.part` file until the MP3 encoder has flushed successfully.
 
 ## Platforms
 
@@ -72,16 +73,16 @@ Both projects expose the same Tauri commands and emit the same events, so the Re
 
 ## Tech stack
 
-- **Tauri 2** with plugins: `dialog`, `fs`, `opener`, `process`
-- **Rust** — `cpal`, `screencapturekit` (macOS), `windows` crate (Windows), `mp3lame-encoder`, `ringbuf`, `crossbeam-channel`, `sysinfo`, `tracing`
+- **Tauri 2** with no filesystem, opener, process, network, or updater plugin
+- **Rust** — `cpal`, `screencapturekit` (macOS), `windows` crate (Windows), `mp3lame-encoder`, `crossbeam-channel`, `sysinfo`, `tracing`
 - **React 18** + TypeScript, **Vite**, **zustand**
 
 ## Getting started
 
 ### Prerequisites
 
-- **Node.js** 18+ and **npm**
-- **Rust** stable (1.77+) — install via [rustup](https://rustup.rs/)
+- **Node.js** 20.19+ and **npm**
+- **Rust** stable — install via [rustup](https://rustup.rs/)
 - **macOS**: Xcode Command Line Tools, macOS 13 (Ventura) or newer
 - **Windows**: Visual Studio Build Tools with the "Desktop development with C++" workload, Windows 10/11
 
@@ -92,12 +93,12 @@ Choose the project for your OS:
 ```bash
 # macOS
 cd mac_
-npm install
+npm ci
 npm run tauri:dev
 
 # Windows
 cd window_
-npm install
+npm ci
 npm run tauri:dev
 ```
 
@@ -144,7 +145,17 @@ Standard user permissions are sufficient. Microphone access follows the Windows 
 4. While recording, audio levels are emitted on the `audio-level` event for the VU meter; errors / warnings go through `recording-error` / `recording-warning`.
 5. `stop_recording` flushes the encoder, closes the file, and returns the output path and duration.
 
-Output files are written to the OS-appropriate recordings directory by default (overridable per session).
+Output files are written to `Documents/AudioRecorder`. A unique name is generated from the selected application and timestamp. The backend, not the WebView, owns that path.
+
+## Privacy and consent
+
+- Audio processing and MP3 encoding happen locally.
+- The application contains no HTTP client, upload flow, telemetry, analytics, or automatic updater.
+- The Content Security Policy only allows bundled assets and Tauri IPC.
+- The microphone is enabled by default for calls and can be disabled before recording.
+- Obtain the other participant's consent and follow the laws that apply to the call.
+
+The application is a recording tool, not a consent-management system. The person starting the recording remains responsible for deciding whether recording is permitted.
 
 ## License
 
